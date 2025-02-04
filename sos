@@ -1009,3 +1009,831 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
+****************Toast  *************************
+
+Toast.makeText(this, "Invalid captcha!", Toast.LENGTH_SHORT).show()
+
+
+****************/DBHelper.kt - V *************************
+
+package com.example.studentdetaildb
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+
+class DBHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+
+    companion object {
+        private const val DATABASE_NAME = "student.db"
+        private const val DATABASE_VERSION = 1
+        private const val TABLE_NAME = "students"
+        private const val COLUMN_ID = "id"
+        private const val COLUMN_NAME = "name"
+        private const val COLUMN_ROLL = "roll"
+        private const val COLUMN_MARKS = "marks"
+
+        private const val CREATE_TABLE = "CREATE TABLE $TABLE_NAME (" +
+                "$COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "$COLUMN_NAME TEXT, " +
+                "$COLUMN_ROLL TEXT, " +
+                "$COLUMN_MARKS TEXT)"
+    }
+
+    override fun onCreate(db: SQLiteDatabase) {
+        db.execSQL(CREATE_TABLE)
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
+        onCreate(db)
+    }
+
+    // Insert data
+    fun insertStudent(name: String, roll: String, marks: String) {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_NAME, name)
+            put(COLUMN_ROLL, roll)
+            put(COLUMN_MARKS, marks)
+        }
+        db.insert(TABLE_NAME, null, values)
+        db.close()
+    }
+
+
+    // Update student details by roll number
+    fun updateStudent(roll: String, name: String, marks: String) {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_NAME, name)
+            put(COLUMN_MARKS, marks)
+        }
+        db.update(TABLE_NAME, values, "$COLUMN_ROLL = ?", arrayOf(roll))
+        db.close()
+    }
+
+    // Delete data
+    fun deleteStudent(id: String) {
+        val db = this.writableDatabase
+        db.delete(TABLE_NAME, "$COLUMN_ROLL = ?", arrayOf(id))
+        db.close()
+    }
+
+    // Retrieve all students
+    fun getAllStudents(): List<Student> {
+        val students = mutableListOf<Student>()
+        val db = this.readableDatabase
+        val cursor: Cursor = db.rawQuery("SELECT * FROM $TABLE_NAME", null)
+
+        if (cursor.moveToFirst()) {
+            do {
+                val student = Student(
+                    id = cursor.getInt(cursor.getColumnIndex(COLUMN_ID)),
+                    name = cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
+                    roll = cursor.getString(cursor.getColumnIndex(COLUMN_ROLL)),
+                    marks = cursor.getString(cursor.getColumnIndex(COLUMN_MARKS))
+                )
+                students.add(student)
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        db.close()
+        return students
+    }
+
+    // Retrieve a student by roll number
+    fun getStudent(roll: String): Student? {
+        val db = this.readableDatabase
+        val cursor: Cursor = db.query(
+            TABLE_NAME,
+            null,
+            "$COLUMN_ROLL = ?",
+            arrayOf(roll),
+            null,
+            null,
+            null
+        )
+        var student: Student? = null
+        if (cursor.moveToFirst()) {
+            student = Student(
+                id = cursor.getInt(cursor.getColumnIndex(COLUMN_ID)),
+                name = cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
+                roll = cursor.getString(cursor.getColumnIndex(COLUMN_ROLL)),
+                marks = cursor.getString(cursor.getColumnIndex(COLUMN_MARKS))
+            )
+        }
+        cursor.close()
+        db.close()
+        return student
+    }
+
+}
+
+// Data class for Student
+data class Student(
+    val id: Int,
+    val name: String,
+    val roll: String,
+    val marks: String
+)
+
+
+***************/MainActivity.kt - V **************************************
+
+package com.example.studentdetaildb
+
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var dbHelper: DBHelper
+    private lateinit var editTextName: EditText
+    private lateinit var editTextRoll: EditText
+    private lateinit var editTextMarks: EditText
+    private lateinit var buttonInsert: Button
+    private lateinit var buttonViewAll: Button
+    private lateinit var textViewResult: TextView
+    private lateinit var buttonView: Button
+    private lateinit var buttonDelete: Button
+    private lateinit var buttonUpdate: Button
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_main)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+        getDrawable()
+        dbHelper = DBHelper(this)
+        editTextName = findViewById(R.id.editTextText3)
+        editTextRoll = findViewById(R.id.editTextText)
+        editTextMarks = findViewById(R.id.editTextText4)
+        buttonInsert = findViewById(R.id.button5)
+        buttonViewAll = findViewById(R.id.button4)
+        buttonView = findViewById(R.id.button)
+        buttonDelete = findViewById(R.id.button2)
+        buttonUpdate = findViewById(R.id.button3)
+        textViewResult = findViewById(R.id.textViewResult)
+        buttonInsert.setOnClickListener {
+            val name = editTextName.text.toString()
+            val roll = editTextRoll.text.toString()
+            val marks = editTextMarks.text.toString()
+            dbHelper.insertStudent(name, roll, marks)
+
+            editTextName.text.clear()
+            editTextRoll.text.clear()
+            editTextMarks.text.clear()
+        }
+        buttonViewAll.setOnClickListener {
+            val students = dbHelper.getAllStudents()
+            textViewResult.text =
+                students.joinToString("\n") { "${it.name} - ${it.roll} - ${it.marks}" }
+        }
+        buttonView.setOnClickListener{
+            val roll = editTextRoll.text.toString()
+            val student = dbHelper.getStudent(roll)
+            if (student != null) {
+                textViewResult.text = "Name: ${student.name}, Roll: ${student.roll}, Marks: ${student.marks}"
+            } else {
+                textViewResult.text = "Student not found"
+            }
+            editTextRoll.text.clear()
+        }
+        buttonDelete.setOnClickListener {
+            val roll = editTextRoll.text.toString()
+            dbHelper.deleteStudent(roll)
+            textViewResult.text = "Student with Roll No $roll deleted."
+            editTextRoll.text.clear() // Clear the delete field after deletion
+        }
+        buttonUpdate.setOnClickListener {
+            val roll = editTextRoll.text.toString()
+            val name = editTextName.text.toString()
+            val marks = editTextMarks.text.toString()
+            dbHelper.updateStudent(roll, name, marks)
+            // Clear update fields
+            editTextRoll.text.clear()
+            editTextName.text.clear()
+            editTextMarks.text.clear()
+            textViewResult.text = "Student with Roll No $roll updated."
+
+        }
+    }
+}
+
+*****MainActiviy.kt  MENUBAR ****
+
+
+package com.example.menudrag
+
+import android.graphics.Color
+import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.Button
+import android.widget.PopupMenu
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import kotlin.random.Random
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var formatButton: Button
+    private lateinit var textView: TextView
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        // Initialize the Toolbar and set it as the ActionBar
+        val toolbar: Toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
+        // Initialize views
+        formatButton = findViewById(R.id.formatButton)
+        textView = findViewById(R.id.textView)
+
+        // Set click listener for the format button to show the popup menu
+        formatButton.setOnClickListener { showPopupMenu(it) }
+    }
+
+    private fun showPopupMenu(view: View) {
+        val popupMenu = PopupMenu(this, view)
+        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu)
+
+        popupMenu.setOnMenuItemClickListener { item: MenuItem ->
+            when (item.itemId) {
+                R.id.small -> changeTextSize(R.dimen.text_size_small)
+                R.id.medium -> changeTextSize(R.dimen.text_size_medium)
+                R.id.large -> changeTextSize(R.dimen.text_size_large)
+                R.id.change_color -> changeTextColor()
+            }
+            true
+        }
+        popupMenu.show()
+    }
+
+    private fun changeTextSize(sizeId: Int) {
+        val size = resources.getDimension(sizeId)
+        textView.textSize = size / resources.displayMetrics.scaledDensity // Convert to sp
+    }
+
+    private fun changeTextColor() {
+        val randomColor = Color.rgb(Random.nextInt(256), Random.nextInt(256), Random.nextInt(256))
+        textView.setTextColor(randomColor)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.options_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.color_red -> {
+                findViewById<View>(android.R.id.content).setBackgroundColor(resources.getColor(R.color.red))
+                true
+            }
+            R.id.color_green -> {
+                findViewById<View>(android.R.id.content).setBackgroundColor(resources.getColor(R.color.green))
+                true
+            }
+            R.id.color_blue -> {
+                findViewById<View>(android.R.id.content).setBackgroundColor(resources.getColor(R.color.blue))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+}
+
+******Rating Bar - dynamic text view - linear layout *******
+
+ratingBar = findViewById(R.id.ratingBar)
+        messageEditText = findViewById(R.id.messageEditText)
+        sendButton = findViewById(R.id.sendButton)
+        feedbackContainer = findViewById(R.id.feedbackContainer) // LinearLayout to hold dynamic TextViews
+
+        // Set up RatingBar listener to create a new TextView for each rating
+        ratingBar.onRatingBarChangeListener = RatingBar.OnRatingBarChangeListener { _, rating, _ ->
+            val message = when (rating.toInt()) {
+                5 -> "Awesome. I love it"
+                4 -> "Good. Enjoyed it"
+                3 -> "Satisfied."
+                2 -> "Not good. Need improvement"
+                1 -> "Disappointed. Very poor"
+                else -> ""
+            }
+            createFeedbackTextView(message) // Create and add TextView for the rating message
+
+            // Clear previous input and focus on input field
+            messageEditText.text.clear()
+            messageEditText.requestFocus()
+        }
+
+        // Set up send button listener
+        sendButton.setOnClickListener {
+            val feedbackMessage = messageEditText.text.toString()
+            val intent2 = Intent(Intent.ACTION_VIEW)
+            intent2.setData(Uri.parse("https://www.psgtech.edu"))
+            startActivity(intent2)
+//            val intent = Intent(this, MainActivity2::class.java)
+//            intent.putExtra("feedback",feedbackMessage)
+//            startActivity(intent)
+
+        }
+    }
+
+    private fun createFeedbackTextView(message: String) {
+        var checkVal = findViewById<TextView>(R.id.dynamic_text_view_id)
+        if(checkVal==null){
+            val textView = TextView(this).apply {
+                id = R.id.dynamic_text_view_id
+                text = message
+                textSize = 16f // Set text size, adjust as needed
+                setPadding(16, 16, 16, 16) // Add padding for better appearance
+            }
+
+            // Find the index of the RatingBar in the feedbackContainer
+            val ratingBarIndex = feedbackContainer.indexOfChild(findViewById<RatingBar>(R.id.ratingBar))
+
+            // Insert the new TextView after the RatingBar
+            feedbackContainer.addView(textView, ratingBarIndex + 1)
+        }
+        else{
+
+            if (checkVal != null) {
+                if (message==""){
+                    feedbackContainer.removeView(checkVal)
+                }
+                else{
+                    checkVal.text = message
+                }
+
+            }
+        }
+****************/DBHelper.kt - V DB*************************
+
+package com.example.studentdetaildb
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+
+class DBHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+
+    companion object {
+        private const val DATABASE_NAME = "student.db"
+        private const val DATABASE_VERSION = 1
+        private const val TABLE_NAME = "students"
+        private const val COLUMN_ID = "id"
+        private const val COLUMN_NAME = "name"
+        private const val COLUMN_ROLL = "roll"
+        private const val COLUMN_MARKS = "marks"
+
+        private const val CREATE_TABLE = "CREATE TABLE $TABLE_NAME (" +
+                "$COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "$COLUMN_NAME TEXT, " +
+                "$COLUMN_ROLL TEXT, " +
+                "$COLUMN_MARKS TEXT)"
+    }
+
+    override fun onCreate(db: SQLiteDatabase) {
+        db.execSQL(CREATE_TABLE)
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
+        onCreate(db)
+    }
+
+    // Insert data
+    fun insertStudent(name: String, roll: String, marks: String) {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_NAME, name)
+            put(COLUMN_ROLL, roll)
+            put(COLUMN_MARKS, marks)
+        }
+        db.insert(TABLE_NAME, null, values)
+        db.close()
+    }
+
+
+    // Update student details by roll number
+    fun updateStudent(roll: String, name: String, marks: String) {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_NAME, name)
+            put(COLUMN_MARKS, marks)
+        }
+        db.update(TABLE_NAME, values, "$COLUMN_ROLL = ?", arrayOf(roll))
+        db.close()
+    }
+
+    // Delete data
+    fun deleteStudent(id: String) {
+        val db = this.writableDatabase
+        db.delete(TABLE_NAME, "$COLUMN_ROLL = ?", arrayOf(id))
+        db.close()
+    }
+
+    // Retrieve all students
+    fun getAllStudents(): List<Student> {
+        val students = mutableListOf<Student>()
+        val db = this.readableDatabase
+        val cursor: Cursor = db.rawQuery("SELECT * FROM $TABLE_NAME", null)
+
+        if (cursor.moveToFirst()) {
+            do {
+                val student = Student(
+                    id = cursor.getInt(cursor.getColumnIndex(COLUMN_ID)),
+                    name = cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
+                    roll = cursor.getString(cursor.getColumnIndex(COLUMN_ROLL)),
+                    marks = cursor.getString(cursor.getColumnIndex(COLUMN_MARKS))
+                )
+                students.add(student)
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        db.close()
+        return students
+    }
+
+    // Retrieve a student by roll number
+    fun getStudent(roll: String): Student? {
+        val db = this.readableDatabase
+        val cursor: Cursor = db.query(
+            TABLE_NAME,
+            null,
+            "$COLUMN_ROLL = ?",
+            arrayOf(roll),
+            null,
+            null,
+            null
+        )
+        var student: Student? = null
+        if (cursor.moveToFirst()) {
+            student = Student(
+                id = cursor.getInt(cursor.getColumnIndex(COLUMN_ID)),
+                name = cursor.getString(cursor.getColumnIndex(COLUMN_NAME)),
+                roll = cursor.getString(cursor.getColumnIndex(COLUMN_ROLL)),
+                marks = cursor.getString(cursor.getColumnIndex(COLUMN_MARKS))
+            )
+        }
+        cursor.close()
+        db.close()
+        return student
+    }
+
+}
+
+// Data class for Student
+data class Student(
+    val id: Int,
+    val name: String,
+    val roll: String,
+    val marks: String
+)
+
+
+***************/MainActivity.kt - V DB **************************************
+
+package com.example.studentdetaildb
+
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var dbHelper: DBHelper
+    private lateinit var editTextName: EditText
+    private lateinit var editTextRoll: EditText
+    private lateinit var editTextMarks: EditText
+    private lateinit var buttonInsert: Button
+    private lateinit var buttonViewAll: Button
+    private lateinit var textViewResult: TextView
+    private lateinit var buttonView: Button
+    private lateinit var buttonDelete: Button
+    private lateinit var buttonUpdate: Button
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContentView(R.layout.activity_main)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+        getDrawable()
+        dbHelper = DBHelper(this)
+        editTextName = findViewById(R.id.editTextText3)
+        editTextRoll = findViewById(R.id.editTextText)
+        editTextMarks = findViewById(R.id.editTextText4)
+        buttonInsert = findViewById(R.id.button5)
+        buttonViewAll = findViewById(R.id.button4)
+        buttonView = findViewById(R.id.button)
+        buttonDelete = findViewById(R.id.button2)
+        buttonUpdate = findViewById(R.id.button3)
+        textViewResult = findViewById(R.id.textViewResult)
+        buttonInsert.setOnClickListener {
+            val name = editTextName.text.toString()
+            val roll = editTextRoll.text.toString()
+            val marks = editTextMarks.text.toString()
+            dbHelper.insertStudent(name, roll, marks)
+
+            editTextName.text.clear()
+            editTextRoll.text.clear()
+            editTextMarks.text.clear()
+        }
+        buttonViewAll.setOnClickListener {
+            val students = dbHelper.getAllStudents()
+            textViewResult.text =
+                students.joinToString("\n") { "${it.name} - ${it.roll} - ${it.marks}" }
+        }
+        buttonView.setOnClickListener{
+            val roll = editTextRoll.text.toString()
+            val student = dbHelper.getStudent(roll)
+            if (student != null) {
+                textViewResult.text = "Name: ${student.name}, Roll: ${student.roll}, Marks: ${student.marks}"
+            } else {
+                textViewResult.text = "Student not found"
+            }
+            editTextRoll.text.clear()
+        }
+        buttonDelete.setOnClickListener {
+            val roll = editTextRoll.text.toString()
+            dbHelper.deleteStudent(roll)
+            textViewResult.text = "Student with Roll No $roll deleted."
+            editTextRoll.text.clear() // Clear the delete field after deletion
+        }
+        buttonUpdate.setOnClickListener {
+            val roll = editTextRoll.text.toString()
+            val name = editTextName.text.toString()
+            val marks = editTextMarks.text.toString()
+            dbHelper.updateStudent(roll, name, marks)
+            // Clear update fields
+            editTextRoll.text.clear()
+            editTextName.text.clear()
+            editTextMarks.text.clear()
+            textViewResult.text = "Student with Roll No $roll updated."
+
+        }
+    }
+}
+
+*****MainActiviy.kt  MENUBAR ****
+
+
+package com.example.menudrag
+
+import android.graphics.Color
+import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.Button
+import android.widget.PopupMenu
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import kotlin.random.Random
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var formatButton: Button
+    private lateinit var textView: TextView
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        // Initialize the Toolbar and set it as the ActionBar
+        val toolbar: Toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
+        // Initialize views
+        formatButton = findViewById(R.id.formatButton)
+        textView = findViewById(R.id.textView)
+
+        // Set click listener for the format button to show the popup menu
+        formatButton.setOnClickListener { showPopupMenu(it) }
+    }
+
+    private fun showPopupMenu(view: View) {
+        val popupMenu = PopupMenu(this, view)
+        popupMenu.menuInflater.inflate(R.menu.popup_menu, popupMenu.menu)
+
+        popupMenu.setOnMenuItemClickListener { item: MenuItem ->
+            when (item.itemId) {
+                R.id.small -> changeTextSize(R.dimen.text_size_small)
+                R.id.medium -> changeTextSize(R.dimen.text_size_medium)
+                R.id.large -> changeTextSize(R.dimen.text_size_large)
+                R.id.change_color -> changeTextColor()
+            }
+            true
+        }
+        popupMenu.show()
+    }
+
+    private fun changeTextSize(sizeId: Int) {
+        val size = resources.getDimension(sizeId)
+        textView.textSize = size / resources.displayMetrics.scaledDensity // Convert to sp
+    }
+
+    private fun changeTextColor() {
+        val randomColor = Color.rgb(Random.nextInt(256), Random.nextInt(256), Random.nextInt(256))
+        textView.setTextColor(randomColor)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.options_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.color_red -> {
+                findViewById<View>(android.R.id.content).setBackgroundColor(resources.getColor(R.color.red))
+                true
+            }
+            R.id.color_green -> {
+                findViewById<View>(android.R.id.content).setBackgroundColor(resources.getColor(R.color.green))
+                true
+            }
+            R.id.color_blue -> {
+                findViewById<View>(android.R.id.content).setBackgroundColor(resources.getColor(R.color.blue))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+}
+
+******Rating Bar - dynamic text view - linear layout ***************************************
+
+ratingBar = findViewById(R.id.ratingBar)
+        messageEditText = findViewById(R.id.messageEditText)
+        sendButton = findViewById(R.id.sendButton)
+        feedbackContainer = findViewById(R.id.feedbackContainer) // LinearLayout to hold dynamic TextViews
+
+        // Set up RatingBar listener to create a new TextView for each rating
+        ratingBar.onRatingBarChangeListener = RatingBar.OnRatingBarChangeListener { _, rating, _ ->
+            val message = when (rating.toInt()) {
+                5 -> "Awesome. I love it"
+                4 -> "Good. Enjoyed it"
+                3 -> "Satisfied."
+                2 -> "Not good. Need improvement"
+                1 -> "Disappointed. Very poor"
+                else -> ""
+            }
+            createFeedbackTextView(message) // Create and add TextView for the rating message
+
+            // Clear previous input and focus on input field
+            messageEditText.text.clear()
+            messageEditText.requestFocus()
+        }
+
+        // Set up send button listener
+        sendButton.setOnClickListener {
+            val feedbackMessage = messageEditText.text.toString()
+            val intent2 = Intent(Intent.ACTION_VIEW)
+            intent2.setData(Uri.parse("https://www.psgtech.edu"))
+            startActivity(intent2)
+//            val intent = Intent(this, MainActivity2::class.java)
+//            intent.putExtra("feedback",feedbackMessage)
+//            startActivity(intent)
+
+        }
+    }
+
+    private fun createFeedbackTextView(message: String) {
+        var checkVal = findViewById<TextView>(R.id.dynamic_text_view_id)
+        if(checkVal==null){
+            val textView = TextView(this).apply {
+                id = R.id.dynamic_text_view_id
+                text = message
+                textSize = 16f // Set text size, adjust as needed
+                setPadding(16, 16, 16, 16) // Add padding for better appearance
+            }
+
+            // Find the index of the RatingBar in the feedbackContainer
+            val ratingBarIndex = feedbackContainer.indexOfChild(findViewById<RatingBar>(R.id.ratingBar))
+
+            // Insert the new TextView after the RatingBar
+            feedbackContainer.addView(textView, ratingBarIndex + 1)
+        }
+        else{
+
+            if (checkVal != null) {
+                if (message==""){
+                    feedbackContainer.removeView(checkVal)
+                }
+                else{
+                    checkVal.text = message
+                }
+
+            }
+        }
+
+
+*****************Intent, Share preference, Toast , Spinner , Array Adapter ******************************************************************
+
+val gender = resources.getStringArray(R.array.Gender)
+        val spinner = findViewById<Spinner>(R.id.spinner)
+        if (spinner != null) {
+            val adapter = ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item, gender
+            )
+            spinner.adapter
+        }
+        var fname = findViewById<EditText>(R.id.editTextText) as EditText
+        var lname = findViewById<EditText>(R.id.editTextText3) as EditText
+        var pnum = findViewById<EditText>(R.id.editTextPhone) as EditText
+        var maill = findViewById<EditText>(R.id.editTextTextEmailAddress) as EditText
+        var bdate = findViewById<EditText>(R.id.editTextDate) as EditText
+        var address = findViewById<EditText>(R.id.editTextTextPostalAddress) as EditText
+        var save = findViewById<Button>(R.id.button) as Button
+        var sh = getSharedPreferences("MySharedPref", MODE_PRIVATE)
+
+        save.setOnClickListener {
+            // Get user input from EditTexts
+            val firstName = fname.text.toString()
+            val lastName = lname.text.toString()
+            val phoneNumber = pnum.text.toString()
+            val email = maill.text.toString()
+            val birthDate = bdate.text.toString()
+            val userAddress = address.text.toString()
+            val selectedGender = spinner.selectedItem.toString()
+
+            // Save data to SharedPreferences
+            with(sh.edit()) {
+                putString("firstName", firstName)
+                putString("lastName", lastName)
+                putString("phoneNumber", phoneNumber)
+                putString("email", email)
+                putString("birthDate", birthDate)
+                putString("address", userAddress)
+                putString("gender", selectedGender)
+                apply() // or commit() if you want to block until it's saved
+            }
+
+            // Create an Intent to start MainActivity2
+            val v1 = Intent(this, MainActivity2::class.java)
+            v1.putExtra("firstName", firstName)
+            v1.putExtra("lastName", lastName)
+            v1.putExtra("phoneNumber", phoneNumber)
+            v1.putExtra("email", email)
+            v1.putExtra("birthDate", birthDate)
+            v1.putExtra("address", userAddress)
+            v1.putExtra("gender", selectedGender)
+
+            Toast.makeText(this, "Details saved and passed successfully!", Toast.LENGTH_SHORT).show()
+
+            // Start MainActivity2 with the intent
+            startActivity(v1)
+
+*************Use intent ******************************************
+  val firstName = intent.getStringExtra("firstName")
+  val lastName = intent.getStringExtra("lastName")
+  val phoneNumber = intent.getStringExtra("phoneNumber")
+  val email = intent.getStringExtra("email")
+
+
+********** Use Shared preference ************************************** 
+val sharedPreferences = getSharedPreferences("MySharedPref", MODE_PRIVATE)
+
+ // Retrieve user details from SharedPreferences
+ val firstName = sharedPreferences.getString("firstName", "Default First Name")
+ val lastName = sharedPreferences.getString("lastName", "Default Last Name")
+ val phoneNumber = sharedPreferences.getString("phoneNumber", "Default Phone Number")
+
+
+
+
+
+
